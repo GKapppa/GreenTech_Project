@@ -1,5 +1,7 @@
 #MENTOR IA - GreenTech Project 🤖🤖
 
+#NOTA: EL PROMPT DEBE SER HECHO EN ESPANOL
+
 Sistema de asistencia inteligente basado en RAG (Retrieval-Augmented Generation) para la "Empresa" GreenTech
 
 #Caracteristicas
