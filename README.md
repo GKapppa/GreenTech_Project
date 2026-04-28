@@ -14,3 +14,14 @@ Sistema de asistencia inteligente basado en RAG (Retrieval-Augmented Generation)
 #Instrucciones de instalacion y uso
 1. **Clonar el repositorio:**
 git clone [https://github.com/GKapppa/GreenTech_Project.git](https://github.com/GKapppa/GreenTech_Project.git)
+
+#Levantar docker
+**Construir la imagen**
+```bash
+docker build -t mentoria-greentech .
+```
+
+**Ejecutar contenedor**
+```bash
+docker run -p 8502:8501 --env-file .env mentoria-greentech
+```
