@@ -1,116 +1,229 @@
-import streamlit as st
 import os
+
+import streamlit as st
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_mongodb import MongoDBAtlasVectorSearch
 from pymongo import MongoClient
 
-# 1. CARGAMOS CONFIGURACION Y VARIABLES
-# Traemos la API KEY y la URL de mongo desde el .env que ya hicimos.
-load_dotenv()
 
+load_dotenv()
 
 DB_NAME = "GreenTech_DB"
 COLLECTION_NAME = "manuals_vectors"
 INDEX_NAME = "vector_index"
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
-# 2. CONFIGURAMOS LOS MODELOS DE INTELIGENCIA ARTIFICIAL.
-# Usamos HugginFace para transformar el texto en vectores (numeros que la IA entiende)
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+SYSTEM_PROMPT = """Eres el Mentor Senior de Ingenieria en GreenTech. Tu mision es capacitar a nuevos integrantes usando manuales tecnicos oficiales.
 
-# Configuramos a LLAMA 3.3 de Groq. le pusimos temperatura 0.2 para que no invente y sea totalmente serio
-llm = ChatGroq(
-    temperature=0.2, # Un poco de fluidez, pero mantenido en lo técnico
-    groq_api_key=os.getenv("GROQ_API_KEY"), 
-    model_name="llama-3.3-70b-versatile"
-)
+ESTILO DE MENTORIA:
+1. Rigor tecnico: usa conceptos como irradiancia, MPPT, inversores, baterias, protecciones y estructura fotovoltaica cuando el contexto lo respalde.
+2. Seguridad primero: si la pregunta implica riesgo electrico, trabajo en altura o manipulacion de equipos, inicia con una advertencia breve.
+3. Formato educativo: responde con pasos, listas o secciones cortas cuando ayude a comprender.
+4. Basado en datos: responde solo con la informacion de los manuales tecnicos proporcionados.
+5. Sin inventos: si el tema no esta cubierto en el contexto, indica que debe validarse con un supervisor o documentacion oficial adicional."""
 
-# 3. CONEXIÓN AL CEREBRO DE DATOS en este caso elegimos (MongoDB Atlas)
-# Aqui nos conectamos a la base de datos donde subimos los PDFs con inges.py
-client = MongoClient(os.getenv("MONGODB_ATLAS_URI"))
-collection = client[DB_NAME][COLLECTION_NAME]
+SIDEBAR_QUESTIONS = {
+    "Fundamentos Fotovoltaicos": "Explicame como funcionan los paneles solares y que es el efecto fotoelectrico.",
+    "Protocolos de Seguridad": "Cuales son las reglas principales de seguridad electrica para trabajar con sistemas fotovoltaicos?",
+    "Sistemas de Almacenamiento": "Como se gestionan las baterias y el ciclo de carga en un sistema fotovoltaico?",
+}
 
-# Este es el buscador que comapra la pregunta del usuario con los manuales guardados
-vector_search = MongoDBAtlasVectorSearch(
-    collection=collection,
-    embedding=embeddings,
-    index_name=INDEX_NAME
-)
 
-# 4. DISEÑO  DE LA INTERFAZ CON STREAMLIT
-# COnfiguramos la pestana del navegador y el titulo principal
-st.set_page_config(page_title="Academia Green Tech", page_icon="☀️", layout="wide")
-st.title("🌱 Green Tech Academy: Mentor de Inducción")
-st.markdown("""
----
-**Bienvenido al equipo.** Soy tu Mentor IA. Mi objetivo es que domines los estándares de la empresa 
-basándome en nuestros manuales técnicos oficiales.
-""")
+def get_missing_environment_variables() -> list[str]:
+    required_variables = ["GROQ_API_KEY", "MONGODB_ATLAS_URI"]
+    return [name for name in required_variables if not os.getenv(name)]
 
-# PANEL LATERAL: Creamos botones para que el usuario no tenga que escribir todo
-with st.sidebar:
-    st.header(" Módulos de Aprendizaje")
-    st.info("Haz clic para repasar conceptos clave:")
-    
-    #Si presiona un boton, se anade la pregunta automaticamente al historial
-    if st.button(" Fundamentos Fotovoltaicos"):
-        st.session_state.messages.append({"role": "user", "content": "Explícame cómo funcionan nuestros paneles y qué es el efecto fotoeléctrico."})
-        
-    if st.button(" Protocolos de Seguridad"):
-        st.session_state.messages.append({"role": "user", "content": "¿Cuáles son las reglas de oro de seguridad eléctrica en Green Tech?"})
-        
-    if st.button(" Sistemas de Almacenamiento"):
-        st.session_state.messages.append({"role": "user", "content": "¿Cómo se gestionan las baterías y el ciclo de carga?"})
 
-    # Boton para limpiar el chat y empezar de cero
-    if st.button(" Reiniciar Tutoría"):
-        st.session_state.messages = []
-        st.rerun()
+@st.cache_resource(show_spinner=False)
+def get_embeddings() -> HuggingFaceEmbeddings:
+    return HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
 
-# SISTEMA DE MEMORIO: Mantiene los mensajes visibles en la pantalla
+
+@st.cache_resource(show_spinner=False)
+def get_llm(groq_api_key: str) -> ChatGroq:
+    return ChatGroq(
+        temperature=0.2,
+        groq_api_key=groq_api_key,
+        model_name=GROQ_MODEL,
+    )
+
+
+@st.cache_resource(show_spinner=False)
+def get_vector_search(mongodb_uri: str) -> MongoDBAtlasVectorSearch:
+    client = MongoClient(mongodb_uri, serverSelectionTimeoutMS=5000)
+    client.admin.command("ping")
+    collection = client[DB_NAME][COLLECTION_NAME]
+
+    return MongoDBAtlasVectorSearch(
+        collection=collection,
+        embedding=get_embeddings(),
+        index_name=INDEX_NAME,
+    )
+
+
+def build_messages(question: str, context: str, memory: str) -> list[dict[str, str]]:
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": (
+                "MEMORIA RECIENTE DE LA SESION:\n"
+                f"{memory}\n\n"
+                "MANUALES TECNICOS DE APOYO:\n"
+                f"{context}\n\n"
+                "PREGUNTA DEL APRENDIZ:\n"
+                f"{question}"
+            ),
+        },
+    ]
+
+
+def search_context(vector_search: MongoDBAtlasVectorSearch, question: str) -> str:
+    docs = vector_search.similarity_search(question, k=4)
+    return "\n\n".join(doc.page_content for doc in docs)
+
+
+def answer_question(question: str, vector_search: MongoDBAtlasVectorSearch, llm: ChatGroq) -> str:
+    context = search_context(vector_search, question)
+
+    if not context.strip():
+        return (
+            "No encontre informacion suficiente en los manuales cargados para responder con rigor. "
+            "Valida este tema con un supervisor humano o con documentacion tecnica oficial adicional."
+        )
+
+    response = llm.invoke(build_messages(question, context, get_memory_tool()))
+    return response.content
+
+
+def search_documents_tool(question: str, vector_search: MongoDBAtlasVectorSearch) -> str:
+    """Busca fragmentos relevantes en el vector store de MongoDB Atlas."""
+    return search_context(vector_search, question)
+
+
+def get_memory_tool() -> str:
+    """Recupera el historial de la sesion actual de Streamlit."""
+    messages = st.session_state.get("messages", [])
+    if not messages:
+        return "No hay mensajes previos en esta sesion."
+
+    return "\n".join(f"{message['role']}: {message['content']}" for message in messages[-6:])
+
+
+def save_memory_tool(role: str, content: str) -> None:
+    """Guarda un mensaje en la memoria corta de la conversacion."""
+    st.session_state.messages.append({"role": role, "content": content})
+
+
+def generate_report_tool(question: str, context: str, llm: ChatGroq) -> str:
+    """Genera un reporte ejecutivo usando la misma base documental recuperada."""
+    report_prompt = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": (
+                "Genera un reporte ejecutivo breve y tecnico para GreenTech.\n\n"
+                "Usa esta estructura:\n"
+                "1. Resumen ejecutivo\n"
+                "2. Hallazgos tecnicos\n"
+                "3. Riesgos o consideraciones de seguridad\n"
+                "4. Recomendaciones\n\n"
+                f"CONTEXTO DOCUMENTAL:\n{context}\n\n"
+                f"SOLICITUD:\n{question}"
+            ),
+        },
+    ]
+    return llm.invoke(report_prompt).content
+
+
+def is_report_request(question: str) -> bool:
+    report_keywords = ["reporte", "informe", "resumen ejecutivo", "documento ejecutivo"]
+    normalized_question = question.lower()
+    return any(keyword in normalized_question for keyword in report_keywords)
+
+
+st.set_page_config(page_title="Academia GreenTech", layout="wide")
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+if "pending_prompt" not in st.session_state:
+    st.session_state.pending_prompt = None
+
+st.title("GreenTech Academy: Mentor de Induccion")
+st.markdown(
+    """
+---
+**Bienvenido al equipo.** Soy tu Mentor IA para consultar los manuales tecnicos de GreenTech mediante RAG.
+"""
+)
+
+missing_variables = get_missing_environment_variables()
+if missing_variables:
+    st.error(
+        "Faltan variables de entorno requeridas en `.env`: "
+        + ", ".join(missing_variables)
+        + ". Revisa `.env.example` antes de ejecutar la aplicacion."
+    )
+    st.stop()
+
+try:
+    vector_search = get_vector_search(os.environ["MONGODB_ATLAS_URI"])
+    llm = get_llm(os.environ["GROQ_API_KEY"])
+except Exception as exc:
+    st.error("No fue posible inicializar el motor RAG. Revisa MongoDB Atlas, el indice vectorial y las credenciales.")
+    st.exception(exc)
+    st.stop()
+
+with st.sidebar:
+    st.header("Modulos de aprendizaje")
+    st.info("Selecciona un tema para generar una consulta guiada.")
+
+    for label, question in SIDEBAR_QUESTIONS.items():
+        if st.button(label):
+            st.session_state.pending_prompt = question
+            st.rerun()
+
+    if st.button("Reiniciar tutoria"):
+        st.session_state.messages = []
+        st.session_state.pending_prompt = None
+        st.rerun()
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 5. EL MOTOR RAG (Busqueda + Respuesta)
-# Cuando el usuario escribe algo en el chat:
-if prompt := st.chat_input("Pregúntame cualquier duda técnica sobre el manual..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
+typed_prompt = st.chat_input("Preguntame una duda tecnica sobre los manuales...")
+prompt = typed_prompt or st.session_state.pending_prompt
+st.session_state.pending_prompt = None
+
+if prompt:
+    save_memory_tool("user", prompt)
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # PASO A: Buscamos en los manuales de Mongo los 4 parrafos mas parecidos a la pregunta
-    docs = vector_search.similarity_search(prompt, k=4)
-    contexto = "\n\n".join([doc.page_content for doc in docs])
-
     with st.chat_message("assistant"):
-        # PASO B: Creamos el "Systema Prompt" que define la personalidad del Mentor.
-        mensajes = [
-            {
-                "role": "system", 
-                "content": """Eres el Mentor Senior de Ingeniería en Green Tech. Tu misión es capacitar a los nuevos empleados.
-                
-                ESTILO DE MENTORÍA:
-                1. Rigor Técnico: Usa términos como Irradiancia, MPPT, Inversores de Cadena, Estructura Coplanar, etc.
-                2. Seguridad Primero: Si la pregunta implica riesgo eléctrico o de altura, DEBES iniciar con una advertencia de seguridad.
-                3. Formato Educativo: Usa negritas para conceptos clave y listas para procesos.
-                4. Basado en Datos: Responde ÚNICAMENTE con la información del manual técnico proporcionado.
-                5. Sin Inventos: Si algo no está en el manual, di: 'Ese tema no está cubierto en la documentación de inducción actual, por favor consúltalo con un supervisor humano'."""
-            },
-            # PASO C: Le pasamos el contexto recuperado de los PDFs y la pregunta
-            {
-                "role": "user", 
-                "content": f"MANUALES TÉCNICOS DE APOYO:\n{contexto}\n\nPREGUNTA DEL APRENDIZ: {prompt}"
-            }
-        ]
+        with st.spinner("Buscando en los manuales tecnicos..."):
+            try:
+                context = search_documents_tool(prompt, vector_search)
+                if is_report_request(prompt):
+                    final_answer = generate_report_tool(prompt, context, llm)
+                elif not context.strip():
+                    final_answer = (
+                        "No encontre informacion suficiente en los manuales cargados para responder con rigor. "
+                        "Valida este tema con un supervisor humano o con documentacion tecnica oficial adicional."
+                    )
+                else:
+                    final_answer = llm.invoke(build_messages(prompt, context, get_memory_tool())).content
+            except Exception as exc:
+                final_answer = (
+                    "Ocurrio un problema al consultar los manuales o generar la respuesta. "
+                    "Revisa la conexion a MongoDB Atlas, el indice vectorial y la API key de Groq."
+                )
+                st.exception(exc)
 
-        # Le pidemos a GROQ que procese todo y nos de la respuesta final.
-        response = llm.invoke(mensajes)
-        respuesta_final = response.content
-        
-        st.markdown(respuesta_final)
-        st.session_state.messages.append({"role": "assistant", "content": respuesta_final})
+        st.markdown(final_answer)
+        save_memory_tool("assistant", final_answer)
