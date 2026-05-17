@@ -1,244 +1,266 @@
-<<<<<<< HEAD
-# MENTOR IA - GreenTech Project 🤖🤖
+# Mentor IA - GreenTech Project
 
-# NOTA: EL PROMPT DEBE SER HECHO EN ESPANOL
-=======
-# Mentor IA GreenTech
->>>>>>> 51c71b2 (Cambios al Ingestpy ' readme)
+Este proyecto es un mentor de induccion tecnica para GreenTech. La idea es que
+una persona pueda hacer preguntas sobre sistemas fotovoltaicos y recibir una
+respuesta basada en los manuales tecnicos del proyecto.
 
-Sistema de asistencia inteligente para GreenTech basado en RAG
-(`Retrieval-Augmented Generation`). La aplicacion permite consultar manuales
-tecnicos de energia solar fotovoltaica usando un modelo de lenguaje de Groq,
-embeddings de Hugging Face y busqueda vectorial en MongoDB Atlas.
+La aplicacion usa RAG, es decir, primero busca informacion relacionada en los
+documentos cargados y despues le pasa ese contexto al modelo de lenguaje para
+generar la respuesta.
 
-<<<<<<< HEAD
-# Caracteristicas
-=======
-Este proyecto conserva una estructura simple para que pueda ejecutarse y
-evaluarse localmente sin una arquitectura innecesariamente compleja.
->>>>>>> 51c71b2 (Cambios al Ingestpy ' readme)
+## Que problema intento resolver
 
-## Problema que resuelve
+En una empresa como GreenTech, una parte importante de la induccion depende de
+manuales, protocolos y documentos tecnicos. El problema es que revisar esos PDF
+manualmente toma tiempo y no siempre es facil encontrar justo la informacion que
+se necesita.
 
-<<<<<<< HEAD
-# Instrucciones de instalacion y uso
-1. **Clonar el repositorio:**
-git clone [https://github.com/GKapppa/GreenTech_Project.git](https://github.com/GKapppa/GreenTech_Project.git)
-
-# Levantar docker
-**Construir la imagen**
-```bash
-docker build -t mentoria-greentech .
-```
-
-**Ejecutar contenedor**
-```bash
-docker run -p 8502:8501 --env-file .env mentoria-greentech
-```
-=======
-GreenTech necesita apoyar la induccion tecnica de nuevos integrantes mediante
-respuestas consistentes, trazables y basadas en documentacion interna. El mentor
-IA ayuda a responder dudas sobre sistemas fotovoltaicos, protocolos de seguridad,
-componentes electricos y criterios de instalacion usando manuales cargados en un
-vector store.
-
-## Estado actual del proyecto
-
-El proyecto fue mejorado hasta el paso 3 del plan incremental:
-
-1. Se mantuvo la aplicacion actual en `ingest.py`, evitando agregar carpetas o
-   componentes nuevos.
-2. Se ordenaron responsabilidades dentro del mismo archivo mediante funciones
-   claras para configuracion, busqueda, memoria corta, prompts y generacion de
-   respuestas.
-3. Se agregaron herramientas internas del agente para demostrar consulta,
-   memoria y generacion de reportes sin cambiar la arquitectura base.
+Con este mentor IA puedo consultar esos documentos desde una interfaz simple y
+obtener respuestas mas rapidas sobre temas como paneles solares, seguridad,
+inversores, baterias y criterios de instalacion.
 
 ## Archivos principales
 
-- `ingest.py`: aplicacion principal de Streamlit y orquestador del mentor IA.
-- `requirements.txt`: dependencias Python necesarias.
-- `.env.example`: plantilla de variables de entorno.
-- `Dockerfile`: configuracion para ejecutar la app en contenedor.
-- `manual.pdf`, `Guia_de_instalacion_de_SFD_-_2013.pdf`,
-  `guia_evaluacion_sistema_fv.pdf`: documentos tecnicos usados como fuente del
-  conocimiento cargado en MongoDB Atlas.
+- `ingest.py`: es la aplicacion principal en Streamlit. Aqui esta el chat, la
+  conexion con MongoDB Atlas, la busqueda vectorial y la llamada al modelo de
+  Groq.
+- `load_pdfs.py`: carga los PDF locales en MongoDB Atlas para que despues puedan
+  ser consultados por el chat.
+- `requirements.txt`: contiene las librerias necesarias para ejecutar el
+  proyecto.
+- `.env.example`: muestra las variables de entorno que se deben configurar.
+- `Dockerfile`: permite levantar la aplicacion usando Docker.
+- `manual.pdf`, `Guia_de_instalacion_de_SFD_-_2013.pdf` y
+  `guia_evaluacion_sistema_fv.pdf`: son los documentos tecnicos usados como base
+  de conocimiento.
 
-## Arquitectura actual
+## Arquitectura general
 
 ```mermaid
 flowchart TD
-    A[Usuario en Streamlit] --> B[ingest.py]
-    B --> C[Memoria corta: st.session_state]
-    B --> D[search_documents_tool]
+    A[Usuario] --> B[Streamlit - ingest.py]
+    B --> C[Memoria corta en st.session_state]
+    B --> D[Busqueda de documentos]
     D --> E[MongoDB Atlas Vector Search]
-    E --> F[Fragmentos tecnicos recuperados]
-    B --> G[Prompt del Mentor GreenTech]
+    E --> F[Fragmentos recuperados de los PDF]
+    F --> G[Prompt del mentor]
     C --> G
-    F --> G
-    G --> H[ChatGroq - Llama 3.3]
-    H --> I[Respuesta tecnica o reporte]
+    G --> H[Modelo Groq Llama 3.3]
+    H --> I[Respuesta final]
     I --> C
     I --> A
 ```
 
 ## Como funciona
 
-1. El usuario escribe una pregunta o selecciona un modulo lateral.
-2. La pregunta se guarda en memoria corta usando `st.session_state`.
-3. La herramienta `search_documents_tool` busca fragmentos relevantes en
-   MongoDB Atlas Vector Search.
-4. El sistema construye un prompt con:
-   - instrucciones del Mentor GreenTech;
-   - memoria reciente de la sesion;
-   - fragmentos tecnicos recuperados;
-   - pregunta del usuario.
-5. Groq genera la respuesta usando el modelo `llama-3.3-70b-versatile`.
-6. La respuesta se muestra en Streamlit y se guarda en la memoria corta.
+1. El usuario escribe una pregunta en el chat.
+2. La pregunta queda guardada en la memoria corta de la sesion.
+3. La funcion `search_documents_tool` busca informacion parecida en MongoDB
+   Atlas.
+4. MongoDB devuelve fragmentos de los PDF que ya fueron cargados como vectores.
+5. La aplicacion arma un prompt con la pregunta, la memoria reciente y el
+   contexto recuperado.
+6. Groq genera la respuesta final.
+7. La respuesta se muestra en pantalla y tambien queda guardada en la memoria de
+   la sesion.
 
-Si la consulta contiene terminos como `reporte`, `informe` o
-`resumen ejecutivo`, la aplicacion usa `generate_report_tool` para devolver una
-respuesta estructurada como reporte ejecutivo.
+Si la pregunta pide un informe o reporte, se usa `generate_report_tool` para
+responder con una estructura mas ordenada.
 
-## Herramientas implementadas
+## Herramientas que deje implementadas
 
-Las herramientas estan implementadas en `ingest.py` para mantener el proyecto
-simple:
+Las herramientas estan dentro de `ingest.py` para mantener el proyecto simple:
 
-- `search_documents_tool(question, vector_search)`: consulta el vector store de
-  MongoDB Atlas y recupera contexto tecnico.
-- `get_memory_tool()`: obtiene los ultimos mensajes de la conversacion actual.
-- `save_memory_tool(role, content)`: guarda mensajes en la memoria corta.
-- `generate_report_tool(question, context, llm)`: genera un reporte ejecutivo
-  breve usando el contexto documental recuperado.
+- `search_documents_tool`: busca informacion tecnica en los documentos cargados.
+- `get_memory_tool`: recupera los ultimos mensajes de la conversacion.
+- `save_memory_tool`: guarda mensajes del usuario y del asistente en la sesion.
+- `generate_report_tool`: genera un reporte breve usando el contexto recuperado.
 
 ## Memoria
 
-La memoria implementada en esta etapa es memoria corta de conversacion. Se
-mantiene en `st.session_state`, por lo que vive durante la sesion activa del
-usuario en Streamlit.
+Por ahora la memoria es de corto plazo. Uso `st.session_state`, que mantiene el
+historial mientras la aplicacion esta abierta.
 
-Al reiniciar la tutoria desde la barra lateral, el historial se limpia.
+Cuando se presiona `Reiniciar tutoria`, se borra el historial de la sesion.
 
 ## Recuperacion semantica
 
-La recuperacion semantica usa:
+Para la recuperacion de contexto uso:
 
 - `HuggingFaceEmbeddings` con el modelo `all-MiniLM-L6-v2`.
-- `MongoDBAtlasVectorSearch` como vector store.
+- `MongoDBAtlasVectorSearch` como base vectorial.
 - Base de datos: `GreenTech_DB`.
 - Coleccion: `manuals_vectors`.
-- Indice vectorial: `vector_index`.
+- Indice: `vector_index`.
 
-La aplicacion asume que los documentos PDF ya fueron cargados previamente en
-MongoDB Atlas con sus embeddings correspondientes.
-
-## Toma de decisiones actual
-
-La decision principal implementada es simple y verificable:
-
-- Si la pregunta solicita un reporte o informe, se genera un reporte ejecutivo.
-- Si la pregunta es tecnica normal, se busca contexto en documentos y se responde
-  con RAG.
-- Si no hay contexto suficiente, se informa que el tema debe validarse con un
-  supervisor o documentacion oficial adicional.
+Los PDF no se leen directamente cada vez que se pregunta algo. Primero hay que
+cargarlos a MongoDB Atlas con `load_pdfs.py`. Despues el chat consulta esa
+coleccion vectorial.
 
 ## Variables de entorno
 
-Crea un archivo `.env` basado en `.env.example`:
+El proyecto necesita un archivo `.env` en la raiz con estas variables:
 
 ```env
 GROQ_API_KEY=tu_api_key_de_groq
 MONGODB_ATLAS_URI=tu_uri_de_mongodb_atlas
 ```
 
-No subas el archivo `.env` al repositorio. Ya esta excluido en `.gitignore`.
+El archivo `.env` no se sube al repositorio porque contiene credenciales.
 
 ## Instalacion local
 
-```bash
+Desde PowerShell:
+
+```powershell
+cd M:\GreenTech_Project
 python -m venv venv
-venv\Scripts\activate
+.\venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-En Linux o macOS:
+Si el entorno virtual ya existe, basta con activarlo:
 
-```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+```powershell
+cd M:\GreenTech_Project
+.\venv\Scripts\activate
 ```
 
-## Ejecucion local
+## Cargar los PDF en MongoDB Atlas
 
-```bash
+Antes de usar el chat, hay que cargar los documentos:
+
+```powershell
+.\venv\Scripts\python.exe load_pdfs.py --reset
+```
+
+Uso `--reset` cuando quiero limpiar la coleccion y volver a cargar los PDF desde
+cero.
+
+En mi prueba, el cargador proceso los tres PDF y genero 92 fragmentos en la
+coleccion `manuals_vectors`.
+
+## Ejecutar la aplicacion
+
+Con el entorno virtual activado:
+
+```powershell
 streamlit run ingest.py
 ```
 
-Luego abre la URL local que muestra Streamlit, normalmente:
+Streamlit normalmente abre esta URL:
 
 ```text
 http://localhost:8501
 ```
 
-## Ejecucion con Docker
+## Ejecutar con Docker
 
-```bash
+Docker no es obligatorio para probar el proyecto. La forma mas directa es usar
+Python y Streamlit. Si quiero correrlo con Docker, primero debo abrir Docker
+Desktop y despues ejecutar:
+
+```powershell
 docker build -t greentech-mentor .
 docker run --env-file .env -p 8501:8501 greentech-mentor
 ```
 
-## Ejemplos de uso
-
-Pregunta tecnica:
+## Ejemplos de preguntas
 
 ```text
 Cuales son las principales medidas de seguridad para instalar paneles fotovoltaicos?
 ```
 
-Pregunta sobre componentes:
-
 ```text
 Explicame que funcion cumple un inversor en un sistema fotovoltaico.
 ```
-
-Solicitud de reporte:
 
 ```text
 Genera un reporte ejecutivo sobre seguridad en instalaciones fotovoltaicas.
 ```
 
-## Evidencia de pruebas sugerida
+## Errores que aparecieron durante la prueba
 
-Para validar manualmente la aplicacion:
+### 1. La aplicacion abria, pero parecia que no leia los PDF
 
-1. Ejecutar `streamlit run ingest.py`.
-2. Probar una pregunta simple sobre paneles solares.
-3. Probar una pregunta tecnica sobre seguridad electrica.
-4. Probar una solicitud de reporte ejecutivo.
-5. Confirmar que las respuestas usan informacion recuperada desde MongoDB Atlas.
-6. Confirmar que al presionar `Reiniciar tutoria` se limpia el historial.
+Al principio el chat se conectaba, pero las respuestas no estaban usando los
+documentos. Revise la coleccion `GreenTech_DB.manuals_vectors` y tenia:
 
-## Justificacion tecnica
+```text
+document_count = 0
+```
 
-- Streamlit permite construir una interfaz simple para demostrar el agente.
-- Groq entrega inferencia rapida con un modelo de lenguaje compatible con
-  LangChain.
-- Hugging Face embeddings permite transformar preguntas y documentos en vectores
-  comparables semanticamente.
-- MongoDB Atlas Vector Search centraliza los fragmentos tecnicos y permite
-  busqueda por similitud.
-- `st.session_state` entrega memoria corta suficiente para esta etapa sin
-  agregar persistencia compleja.
+Eso significaba que MongoDB Atlas estaba configurado, pero no tenia documentos
+vectorizados cargados. La solucion fue crear `load_pdfs.py` y cargar los PDF con:
+
+```powershell
+.\venv\Scripts\python.exe load_pdfs.py
+```
+
+Despues de eso la coleccion quedo con 92 fragmentos.
+
+### 2. Python no encontraba `dotenv`
+
+Cuando intente revisar MongoDB usando `python` directamente, aparecio este error:
+
+```text
+ModuleNotFoundError: No module named 'dotenv'
+```
+
+El problema era que estaba usando el Python global y no el entorno virtual del
+proyecto. La solucion fue ejecutar los comandos con:
+
+```powershell
+.\venv\Scripts\python.exe
+```
+
+### 3. Error de DNS al consultar MongoDB Atlas
+
+Tambien aparecio un error de resolucion DNS al intentar conectarme a MongoDB
+Atlas desde el entorno restringido:
+
+```text
+dns.resolver.LifetimeTimeout
+```
+
+La conexion funciono cuando ejecute el diagnostico con permisos de red. En una
+ejecucion local normal, esto depende de tener internet, que el URI de MongoDB sea
+correcto y que la IP este permitida en MongoDB Atlas.
+
+### 4. Advertencia de Hugging Face
+
+Al cargar los embeddings aparecio esta advertencia:
+
+```text
+You are sending unauthenticated requests to the HF Hub
+```
+
+No bloquea el funcionamiento. Solo avisa que se esta descargando el modelo sin
+token de Hugging Face. Para este proyecto no fue necesario configurar `HF_TOKEN`,
+pero podria agregarse si hubiera problemas de limite o descarga.
+
+### 5. Conflicto en README
+
+El README quedo con marcas de conflicto de Git despues de mezclar cambios. Lo
+corregi dejando una sola version del documento y eliminando las partes
+duplicadas.
+
+## Pruebas manuales
+
+Estas son las pruebas que use para comprobar el funcionamiento:
+
+1. Verifique que MongoDB Atlas tuviera documentos cargados.
+2. Ejecute una busqueda semantica de prueba sobre seguridad electrica.
+3. Confirme que devolvia fragmentos desde
+   `Guia_de_instalacion_de_SFD_-_2013.pdf`.
+4. Ejecute la aplicacion con `streamlit run ingest.py`.
+5. Probe una pregunta tecnica y una solicitud de reporte.
 
 ## Limitaciones actuales
 
-- La memoria es solo de corto plazo; no persiste al cerrar la sesion.
-- La planificacion de intencion es basica y se limita a detectar solicitudes de
-  reporte.
-- Los documentos deben estar cargados previamente en MongoDB Atlas.
-- No se agregaron carpetas nuevas ni una arquitectura modular completa porque el
-  alcance solicitado fue mejorar el proyecto actual sin incorporar componentes
-  nuevos grandes.
->>>>>>> 51c71b2 (Cambios al Ingestpy ' readme)
+- La memoria solo dura mientras la sesion de Streamlit esta activa.
+- Los PDF deben cargarse antes con `load_pdfs.py`.
+- La deteccion de reportes es simple: busca palabras como `reporte`, `informe` o
+  `resumen ejecutivo`.
+- El proyecto sigue en una estructura simple, sin separar todo en modulos, porque
+  en esta etapa preferi mejorar lo que ya existia sin cambiar demasiado la base.
