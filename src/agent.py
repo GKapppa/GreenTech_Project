@@ -4,6 +4,7 @@ from langchain_groq import ChatGroq
 
 from src.memory import LongTermMemoryStore
 from src.planner import Intent, Plan, classify_intent
+from src.prompts import build_rag_messages, build_simple_answer_messages
 from src.tools import GreenTechTools, build_tools
 
 
@@ -68,18 +69,7 @@ class GreenTechAgent:
         return AgentResponse(answer, plan, context, short_memory, long_memory)
 
     def _answer_simple(self, question: str, short_memory: str, long_memory: str) -> str:
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            {
-                "role": "user",
-                "content": (
-                    "Responde de forma breve y directa. No inventes datos tecnicos.\n\n"
-                    f"MEMORIA CORTA:\n{short_memory}\n\n"
-                    f"MEMORIA LARGA:\n{long_memory}\n\n"
-                    f"PREGUNTA:\n{question}"
-                ),
-            },
-        ]
+        messages = build_simple_answer_messages(question, short_memory, long_memory, self.system_prompt)
         return self.llm.invoke(messages).content
 
     def _build_messages(
@@ -90,17 +80,12 @@ class GreenTechAgent:
         long_memory: str,
         plan: Plan,
     ) -> list[dict[str, str]]:
-        return [
-            {"role": "system", "content": self.system_prompt},
-            {
-                "role": "user",
-                "content": (
-                    f"INTENCION DETECTADA: {plan.intent.value}\n"
-                    f"MOTIVO DEL PLAN: {plan.reason}\n\n"
-                    f"MEMORIA CORTA:\n{short_memory}\n\n"
-                    f"MEMORIA LARGA:\n{long_memory}\n\n"
-                    f"MANUALES TECNICOS DE APOYO:\n{context}\n\n"
-                    f"PREGUNTA DEL APRENDIZ:\n{question}"
-                ),
-            },
-        ]
+        return build_rag_messages(
+            question=question,
+            context=context,
+            short_memory=short_memory,
+            long_memory=long_memory,
+            intent=plan.intent.value,
+            reason=plan.reason,
+            system_prompt=self.system_prompt,
+        )

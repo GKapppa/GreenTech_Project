@@ -2,6 +2,8 @@ from langchain_core.tools import tool
 from langchain_groq import ChatGroq
 from langchain_mongodb import MongoDBAtlasVectorSearch
 
+from src.prompts import build_report_messages
+
 
 class GreenTechTools:
     def __init__(
@@ -35,22 +37,7 @@ class GreenTechTools:
 
     def generate_report(self, topic: str, context: str | None = None) -> str:
         report_context = context or self.search_documents(topic)
-        report_prompt = [
-            {"role": "system", "content": self.system_prompt},
-            {
-                "role": "user",
-                "content": (
-                    "Genera un reporte ejecutivo breve y tecnico para GreenTech.\n\n"
-                    "Usa esta estructura:\n"
-                    "1. Resumen ejecutivo\n"
-                    "2. Hallazgos tecnicos\n"
-                    "3. Riesgos o consideraciones de seguridad\n"
-                    "4. Recomendaciones\n\n"
-                    f"CONTEXTO DOCUMENTAL:\n{report_context}\n\n"
-                    f"SOLICITUD:\n{topic}"
-                ),
-            },
-        ]
+        report_prompt = build_report_messages(topic, report_context, self.system_prompt)
         return self.llm.invoke(report_prompt).content
 
 

@@ -28,6 +28,8 @@ inversores, baterias y criterios de instalacion.
   de accion, llama herramientas y devuelve la respuesta.
 - `src/planner.py`: clasifica la intencion del usuario antes de responder.
 - `src/memory.py`: maneja la memoria larga en un archivo JSON local.
+- `src/prompts.py`: centraliza el prompt del mentor y las plantillas usadas para
+  respuestas simples, RAG y reportes.
 - `src/tools.py`: contiene las herramientas del agente registradas con `@tool`
   de LangChain.
 - `load_pdfs.py`: carga los PDF locales en MongoDB Atlas para que despues puedan

@@ -9,6 +9,7 @@ from pymongo import MongoClient
 
 from src.agent import GreenTechAgent
 from src.memory import LongTermMemoryStore
+from src.prompts import SYSTEM_PROMPT
 from src.tools import GreenTechTools
 
 
@@ -20,14 +21,6 @@ INDEX_NAME = "vector_index"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
-SYSTEM_PROMPT = """Eres el Mentor Senior de Ingenieria en GreenTech. Tu mision es capacitar a nuevos integrantes usando manuales tecnicos oficiales.
-
-ESTILO DE MENTORIA:
-1. Rigor tecnico: usa conceptos como irradiancia, MPPT, inversores, baterias, protecciones y estructura fotovoltaica cuando el contexto lo respalde.
-2. Seguridad primero: si la pregunta implica riesgo electrico, trabajo en altura o manipulacion de equipos, inicia con una advertencia breve.
-3. Formato educativo: responde con pasos, listas o secciones cortas cuando ayude a comprender.
-4. Basado en datos: responde solo con la informacion de los manuales tecnicos proporcionados.
-5. Sin inventos: si el tema no esta cubierto en el contexto, indica que debe validarse con un supervisor o documentacion oficial adicional."""
 
 SIDEBAR_QUESTIONS = {
     "Fundamentos Fotovoltaicos": "Explicame como funcionan los paneles solares y que es el efecto fotoelectrico.",
