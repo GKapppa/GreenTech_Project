@@ -7,6 +7,10 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_mongodb import MongoDBAtlasVectorSearch
 from pymongo import MongoClient
 
+from src.agent import GreenTechAgent
+from src.memory import LongTermMemoryStore
+from src.tools import GreenTechTools
+
 
 load_dotenv()
 
@@ -63,88 +67,6 @@ def get_vector_search(mongodb_uri: str) -> MongoDBAtlasVectorSearch:
         index_name=INDEX_NAME,
     )
 
-
-def build_messages(question: str, context: str, memory: str) -> list[dict[str, str]]:
-    return [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": (
-                "MEMORIA RECIENTE DE LA SESION:\n"
-                f"{memory}\n\n"
-                "MANUALES TECNICOS DE APOYO:\n"
-                f"{context}\n\n"
-                "PREGUNTA DEL APRENDIZ:\n"
-                f"{question}"
-            ),
-        },
-    ]
-
-
-def search_context(vector_search: MongoDBAtlasVectorSearch, question: str) -> str:
-    docs = vector_search.similarity_search(question, k=4)
-    return "\n\n".join(doc.page_content for doc in docs)
-
-
-def answer_question(question: str, vector_search: MongoDBAtlasVectorSearch, llm: ChatGroq) -> str:
-    context = search_context(vector_search, question)
-
-    if not context.strip():
-        return (
-            "No encontre informacion suficiente en los manuales cargados para responder con rigor. "
-            "Valida este tema con un supervisor humano o con documentacion tecnica oficial adicional."
-        )
-
-    response = llm.invoke(build_messages(question, context, get_memory_tool()))
-    return response.content
-
-
-def search_documents_tool(question: str, vector_search: MongoDBAtlasVectorSearch) -> str:
-    """Busca fragmentos relevantes en el vector store de MongoDB Atlas."""
-    return search_context(vector_search, question)
-
-
-def get_memory_tool() -> str:
-    """Recupera el historial de la sesion actual de Streamlit."""
-    messages = st.session_state.get("messages", [])
-    if not messages:
-        return "No hay mensajes previos en esta sesion."
-
-    return "\n".join(f"{message['role']}: {message['content']}" for message in messages[-6:])
-
-
-def save_memory_tool(role: str, content: str) -> None:
-    """Guarda un mensaje en la memoria corta de la conversacion."""
-    st.session_state.messages.append({"role": role, "content": content})
-
-
-def generate_report_tool(question: str, context: str, llm: ChatGroq) -> str:
-    """Genera un reporte ejecutivo usando la misma base documental recuperada."""
-    report_prompt = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": (
-                "Genera un reporte ejecutivo breve y tecnico para GreenTech.\n\n"
-                "Usa esta estructura:\n"
-                "1. Resumen ejecutivo\n"
-                "2. Hallazgos tecnicos\n"
-                "3. Riesgos o consideraciones de seguridad\n"
-                "4. Recomendaciones\n\n"
-                f"CONTEXTO DOCUMENTAL:\n{context}\n\n"
-                f"SOLICITUD:\n{question}"
-            ),
-        },
-    ]
-    return llm.invoke(report_prompt).content
-
-
-def is_report_request(question: str) -> bool:
-    report_keywords = ["reporte", "informe", "resumen ejecutivo", "documento ejecutivo"]
-    normalized_question = question.lower()
-    return any(keyword in normalized_question for keyword in report_keywords)
-
-
 st.set_page_config(page_title="Academia GreenTech", layout="wide")
 
 if "messages" not in st.session_state:
@@ -173,6 +95,18 @@ if missing_variables:
 try:
     vector_search = get_vector_search(os.environ["MONGODB_ATLAS_URI"])
     llm = get_llm(os.environ["GROQ_API_KEY"])
+    greentech_tools = GreenTechTools(
+        vector_search=vector_search,
+        llm=llm,
+        memory=st.session_state.messages,
+        system_prompt=SYSTEM_PROMPT,
+    )
+    agent = GreenTechAgent(
+        tools=greentech_tools,
+        llm=llm,
+        memory_store=LongTermMemoryStore(),
+        system_prompt=SYSTEM_PROMPT,
+    )
 except Exception as exc:
     st.error("No fue posible inicializar el motor RAG. Revisa MongoDB Atlas, el indice vectorial y las credenciales.")
     st.exception(exc)
@@ -201,23 +135,15 @@ prompt = typed_prompt or st.session_state.pending_prompt
 st.session_state.pending_prompt = None
 
 if prompt:
-    save_memory_tool("user", prompt)
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
         with st.spinner("Buscando en los manuales tecnicos..."):
+            agent_response = None
             try:
-                context = search_documents_tool(prompt, vector_search)
-                if is_report_request(prompt):
-                    final_answer = generate_report_tool(prompt, context, llm)
-                elif not context.strip():
-                    final_answer = (
-                        "No encontre informacion suficiente en los manuales cargados para responder con rigor. "
-                        "Valida este tema con un supervisor humano o con documentacion tecnica oficial adicional."
-                    )
-                else:
-                    final_answer = llm.invoke(build_messages(prompt, context, get_memory_tool())).content
+                agent_response = agent.run(prompt)
+                final_answer = agent_response.answer
             except Exception as exc:
                 final_answer = (
                     "Ocurrio un problema al consultar los manuales o generar la respuesta. "
@@ -226,4 +152,7 @@ if prompt:
                 st.exception(exc)
 
         st.markdown(final_answer)
-        save_memory_tool("assistant", final_answer)
+        if agent_response:
+            with st.expander("Decision del agente"):
+                st.write(f"Intencion: {agent_response.plan.intent.value}")
+                st.write(f"Motivo: {agent_response.plan.reason}")

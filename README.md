@@ -24,6 +24,12 @@ inversores, baterias y criterios de instalacion.
 - `ingest.py`: es la aplicacion principal en Streamlit. Aqui esta el chat, la
   conexion con MongoDB Atlas, la busqueda vectorial y la llamada al modelo de
   Groq.
+- `src/agent.py`: contiene el agente principal. Recibe la pregunta, pide un plan
+  de accion, llama herramientas y devuelve la respuesta.
+- `src/planner.py`: clasifica la intencion del usuario antes de responder.
+- `src/memory.py`: maneja la memoria larga en un archivo JSON local.
+- `src/tools.py`: contiene las herramientas del agente registradas con `@tool`
+  de LangChain.
 - `load_pdfs.py`: carga los PDF locales en MongoDB Atlas para que despues puedan
   ser consultados por el chat.
 - `requirements.txt`: contiene las librerias necesarias para ejecutar el
@@ -39,49 +45,80 @@ inversores, baterias y criterios de instalacion.
 ```mermaid
 flowchart TD
     A[Usuario] --> B[Streamlit - ingest.py]
-    B --> C[Memoria corta en st.session_state]
-    B --> D[Busqueda de documentos]
-    D --> E[MongoDB Atlas Vector Search]
-    E --> F[Fragmentos recuperados de los PDF]
-    F --> G[Prompt del mentor]
-    C --> G
-    G --> H[Modelo Groq Llama 3.3]
-    H --> I[Respuesta final]
-    I --> C
-    I --> A
+    B --> C[GreenTechAgent]
+    C --> D[Planner]
+    C --> E[Tools con @tool]
+    C --> F[Memoria larga JSON]
+    E --> G[MongoDB Atlas Vector Search]
+    G --> H[Fragmentos recuperados de los PDF]
+    C --> I[Prompt del mentor]
+    H --> I
+    F --> I
+    I --> J[Modelo Groq Llama 3.3]
+    J --> K[Respuesta final]
+    K --> A
 ```
 
 ## Como funciona
 
 1. El usuario escribe una pregunta en el chat.
-2. La pregunta queda guardada en la memoria corta de la sesion.
-3. La funcion `search_documents_tool` busca informacion parecida en MongoDB
-   Atlas.
-4. MongoDB devuelve fragmentos de los PDF que ya fueron cargados como vectores.
-5. La aplicacion arma un prompt con la pregunta, la memoria reciente y el
+2. `ingest.py` envia la pregunta a `GreenTechAgent`.
+3. El agente usa `planner.py` para clasificar la intencion.
+4. Segun el plan, el agente decide si busca documentos, usa memoria o genera un
+   reporte.
+5. La funcion `search_documents_tool` busca informacion parecida en MongoDB
+   Atlas cuando la consulta lo necesita.
+6. El agente arma el prompt con la pregunta, memoria corta, memoria larga y
    contexto recuperado.
-6. Groq genera la respuesta final.
-7. La respuesta se muestra en pantalla y tambien queda guardada en la memoria de
-   la sesion.
+7. Groq genera la respuesta final.
+8. La respuesta se muestra en pantalla y tambien queda guardada en memoria.
 
 Si la pregunta pide un informe o reporte, se usa `generate_report_tool` para
 responder con una estructura mas ordenada.
 
 ## Herramientas que deje implementadas
 
-Las herramientas estan dentro de `ingest.py` para mantener el proyecto simple:
+Las herramientas estan en `src/tools.py` y usan el decorador `@tool` de
+LangChain. Esto me permite mostrar que el proyecto no solo tiene funciones
+sueltas, sino herramientas que pueden ser registradas por un agente.
 
 - `search_documents_tool`: busca informacion tecnica en los documentos cargados.
 - `get_memory_tool`: recupera los ultimos mensajes de la conversacion.
 - `save_memory_tool`: guarda mensajes del usuario y del asistente en la sesion.
 - `generate_report_tool`: genera un reporte breve usando el contexto recuperado.
 
+En `ingest.py` estas herramientas se construyen con `build_tools()` y se usan en
+el flujo principal del chat.
+
 ## Memoria
 
-Por ahora la memoria es de corto plazo. Uso `st.session_state`, que mantiene el
-historial mientras la aplicacion esta abierta.
+El proyecto usa dos tipos de memoria:
+
+- Memoria corta: usa `st.session_state` para mantener el historial mientras la
+  aplicacion esta abierta.
+- Memoria larga: usa `data/memory/long_term_memory.json` para guardar resumenes
+  de interacciones anteriores.
 
 Cuando se presiona `Reiniciar tutoria`, se borra el historial de la sesion.
+Eso no borra la memoria larga guardada en JSON.
+
+## Planificacion y decisiones
+
+El archivo `src/planner.py` clasifica cada consulta en una de estas intenciones:
+
+- `consulta_simple`
+- `consulta_tecnica`
+- `solicitud_reporte`
+- `continuidad_contexto`
+- `informacion_insuficiente`
+
+Con esa clasificacion, el agente decide que hacer:
+
+- si falta informacion, pide mas detalle;
+- si es una consulta simple, responde directo usando memoria;
+- si es tecnica, busca documentos antes de responder;
+- si pide reporte, usa contexto documental y genera una estructura ejecutiva;
+- si depende de algo anterior, incluye memoria corta y memoria larga.
 
 ## Recuperacion semantica
 
@@ -258,9 +295,9 @@ Estas son las pruebas que use para comprobar el funcionamiento:
 
 ## Limitaciones actuales
 
-- La memoria solo dura mientras la sesion de Streamlit esta activa.
+- La memoria larga guarda resumenes simples; no hace todavia una compresion
+  avanzada de conversaciones.
 - Los PDF deben cargarse antes con `load_pdfs.py`.
 - La deteccion de reportes es simple: busca palabras como `reporte`, `informe` o
   `resumen ejecutivo`.
-- El proyecto sigue en una estructura simple, sin separar todo en modulos, porque
-  en esta etapa preferi mejorar lo que ya existia sin cambiar demasiado la base.
+- Aun faltan pruebas automatizadas y documentos tecnicos separados en `docs/`.
