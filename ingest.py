@@ -3,25 +3,16 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_mongodb import MongoDBAtlasVectorSearch
-from pymongo import MongoClient
 
 from src.agent import GreenTechAgent
 from src.memory import LongTermMemoryStore
 from src.prompts import SYSTEM_PROMPT
 from src.tools import GreenTechTools
-
+from src.vectorstore import get_vector_search
 
 load_dotenv()
 
-DB_NAME = "GreenTech_DB"
-COLLECTION_NAME = "manuals_vectors"
-INDEX_NAME = "vector_index"
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 GROQ_MODEL = "llama-3.3-70b-versatile"
-
-
 SIDEBAR_QUESTIONS = {
     "Fundamentos Fotovoltaicos": "Explicame como funcionan los paneles solares y que es el efecto fotoelectrico.",
     "Protocolos de Seguridad": "Cuales son las reglas principales de seguridad electrica para trabajar con sistemas fotovoltaicos?",
@@ -35,11 +26,6 @@ def get_missing_environment_variables() -> list[str]:
 
 
 @st.cache_resource(show_spinner=False)
-def get_embeddings() -> HuggingFaceEmbeddings:
-    return HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
-
-
-@st.cache_resource(show_spinner=False)
 def get_llm(groq_api_key: str) -> ChatGroq:
     return ChatGroq(
         temperature=0.2,
@@ -49,16 +35,8 @@ def get_llm(groq_api_key: str) -> ChatGroq:
 
 
 @st.cache_resource(show_spinner=False)
-def get_vector_search(mongodb_uri: str) -> MongoDBAtlasVectorSearch:
-    client = MongoClient(mongodb_uri, serverSelectionTimeoutMS=5000)
-    client.admin.command("ping")
-    collection = client[DB_NAME][COLLECTION_NAME]
-
-    return MongoDBAtlasVectorSearch(
-        collection=collection,
-        embedding=get_embeddings(),
-        index_name=INDEX_NAME,
-    )
+def get_cached_vector_search(mongodb_uri: str):
+    return get_vector_search(mongodb_uri)
 
 st.set_page_config(page_title="Academia GreenTech", layout="wide")
 
@@ -86,7 +64,7 @@ if missing_variables:
     st.stop()
 
 try:
-    vector_search = get_vector_search(os.environ["MONGODB_ATLAS_URI"])
+    vector_search = get_cached_vector_search(os.environ["MONGODB_ATLAS_URI"])
     llm = get_llm(os.environ["GROQ_API_KEY"])
     greentech_tools = GreenTechTools(
         vector_search=vector_search,

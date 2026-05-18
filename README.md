@@ -41,6 +41,9 @@ inversores, baterias y criterios de instalacion.
 - `manual.pdf`, `Guia_de_instalacion_de_SFD_-_2013.pdf` y
   `guia_evaluacion_sistema_fv.pdf`: son los documentos tecnicos usados como base
   de conocimiento.
+- `docs/diagrama_orquestacion.md`: explica la comunicacion entre componentes.
+- `docs/flujo_trabajo.md`: muestra el flujo de decision del agente.
+- `docs/evidencia_pruebas.md`: documenta pruebas manuales.
 
 ## Arquitectura general
 
@@ -294,6 +297,51 @@ Estas son las pruebas que use para comprobar el funcionamiento:
    `Guia_de_instalacion_de_SFD_-_2013.pdf`.
 4. Ejecute la aplicacion con `streamlit run ingest.py`.
 5. Probe una pregunta tecnica y una solicitud de reporte.
+
+La evidencia esta documentada en `docs/evidencia_pruebas.md`.
+
+## Documentacion tecnica
+
+- Diagrama de orquestacion: `docs/diagrama_orquestacion.md`
+- Flujo de trabajo del agente: `docs/flujo_trabajo.md`
+- Evidencia de pruebas: `docs/evidencia_pruebas.md`
+
+## Cumplimiento de indicadores IE1-IE10
+
+| Indicador | Como se cumple en el proyecto |
+|---|---|
+| IE1: Herramientas configuradas dentro del agente | Las herramientas estan en `src/tools.py` y usan `@tool`: `search_documents_tool`, `get_memory_tool`, `save_memory_tool` y `generate_report_tool`. |
+| IE2: Framework adecuado para agentes | Se usa LangChain para herramientas, Groq como LLM y Streamlit como interfaz. El agente principal esta en `src/agent.py`. |
+| IE3: Memoria de contenido | Hay memoria corta con `st.session_state` y memoria larga en JSON con `src/memory.py`. |
+| IE4: Recuperacion semantica de contexto | Se usa `HuggingFaceEmbeddings` y `MongoDBAtlasVectorSearch` en `src/vectorstore.py`. |
+| IE5: Planificacion de tareas | `src/planner.py` clasifica la intencion antes de responder. |
+| IE6: Toma de decisiones | `GreenTechAgent` decide si responde directo, busca documentos, genera reporte o pide mas informacion. |
+| IE7: README y diagrama de orquestacion | El README explica el proyecto y `docs/diagrama_orquestacion.md` contiene el diagrama Mermaid. |
+| IE8: Justificacion tecnica de componentes | El README explica por que se usan Streamlit, Groq, MongoDB Atlas, embeddings y memoria JSON. |
+| IE9: Informe tecnico, diagramas y flujos | La carpeta `docs/` contiene diagrama de orquestacion, flujo de trabajo y evidencia de pruebas. |
+| IE10: Lenguaje tecnico claro y evidencia | `docs/evidencia_pruebas.md` documenta escenarios de prueba y resultados esperados. |
+
+## Capturas de evidencia
+
+Si uso capturas de pantalla para respaldar las pruebas, las dejo en:
+
+```text
+docs/img/
+```
+
+Nombre sugerido:
+
+```text
+docs/img/prueba_1_pregunta_simple.png
+docs/img/prueba_2_consulta_tecnica.png
+docs/img/prueba_3_reporte.png
+```
+
+Luego se pueden referenciar desde `docs/evidencia_pruebas.md` asi:
+
+```markdown
+![Prueba 1 - pregunta simple](img/prueba_1_pregunta_simple.png)
+```
 
 ## Limitaciones actuales
 
