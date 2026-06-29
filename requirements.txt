@@ -1,0 +1,12 @@
+streamlit
+langchain-groq
+langchain-huggingface
+langchain-mongodb
+pymongo
+python-dotenv
+pypdf
+sentence-transformers
+torchvision
+pytest
+psutil
+scikit-learn
