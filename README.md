@@ -1,158 +1,111 @@
 # Mentor IA - GreenTech Project
 
-Este proyecto es un mentor de induccion tecnica para GreenTech. La idea es que
-una persona pueda hacer preguntas sobre sistemas fotovoltaicos y recibir una
-respuesta basada en los manuales tecnicos del proyecto.
+Sistema de mentor de induccion tecnica para GreenTech. Permite realizar preguntas
+sobre sistemas fotovoltaicos y recibir respuestas basadas en los manuales tecnicos
+del proyecto mediante recuperacion semantica (RAG).
 
-La aplicacion usa RAG, es decir, primero busca informacion relacionada en los
-documentos cargados y despues le pasa ese contexto al modelo de lenguaje para
-generar la respuesta.
+## Arquitectura del sistema
 
-## Que problema intento resolver
-
-En una empresa como GreenTech, una parte importante de la induccion depende de
-manuales, protocolos y documentos tecnicos. El problema es que revisar esos PDF
-manualmente toma tiempo y no siempre es facil encontrar justo la informacion que
-se necesita.
-
-Con este mentor IA puedo consultar esos documentos desde una interfaz simple y
-obtener respuestas mas rapidas sobre temas como paneles solares, seguridad,
-inversores, baterias y criterios de instalacion.
-
-## Archivos principales
-
-- `ingest.py`: es la aplicacion principal en Streamlit. Aqui esta el chat, la
-  conexion con MongoDB Atlas, la busqueda vectorial y la llamada al modelo de
-  Groq.
-- `src/agent.py`: contiene el agente principal. Recibe la pregunta, pide un plan
-  de accion, llama herramientas y devuelve la respuesta.
-- `src/planner.py`: clasifica la intencion del usuario antes de responder.
-- `src/memory.py`: maneja la memoria larga en un archivo JSON local.
-- `src/prompts.py`: centraliza el prompt del mentor y las plantillas usadas para
-  respuestas simples, RAG y reportes.
-- `src/tools.py`: contiene las herramientas del agente registradas con `@tool`
-  de LangChain.
-- `load_pdfs.py`: carga los PDF locales en MongoDB Atlas para que despues puedan
-  ser consultados por el chat.
-- `requirements.txt`: contiene las librerias necesarias para ejecutar el
-  proyecto.
-- `.env.example`: muestra las variables de entorno que se deben configurar.
-- `Dockerfile`: permite levantar la aplicacion usando Docker.
-- `manual.pdf`, `Guia_de_instalacion_de_SFD_-_2013.pdf` y
-  `guia_evaluacion_sistema_fv.pdf`: son los documentos tecnicos usados como base
-  de conocimiento.
-- `docs/diagrama_orquestacion.md`: explica la comunicacion entre componentes.
-- `docs/flujo_trabajo.md`: muestra el flujo de decision del agente.
-- `docs/evidencia_pruebas.md`: documenta pruebas manuales.
-
-## Arquitectura general
-
-```mermaid
-flowchart TD
-    A[Usuario] --> B[Streamlit - ingest.py]
-    B --> C[GreenTechAgent]
-    C --> D[Planner]
-    C --> E[Tools con @tool]
-    C --> F[Memoria larga JSON]
-    E --> G[MongoDB Atlas Vector Search]
-    G --> H[Fragmentos recuperados de los PDF]
-    C --> I[Prompt del mentor]
-    H --> I
-    F --> I
-    I --> J[Modelo Groq Llama 3.3]
-    J --> K[Respuesta final]
-    K --> A
+```
+Usuario -> Streamlit (ingest.py) -> GreenTechAgent
+                                      |
+                                      +-> Planner (clasificacion de intencion)
+                                      +-> Tools (busqueda, memoria, reportes)
+                                      +-> ObservabilityLogger (telemetria)
+                                      +-> SecurityGuardrails (PII, inyeccion)
+                                      +-> SemanticCache (caching)
+                                      |
+                                      +-> MongoDB Atlas Vector Search
+                                      +-> Groq Llama 3.3
 ```
 
-## Como funciona
+## Estructura del proyecto
 
-1. El usuario escribe una pregunta en el chat.
-2. `ingest.py` envia la pregunta a `GreenTechAgent`.
-3. El agente usa `planner.py` para clasificar la intencion.
-4. Segun el plan, el agente decide si busca documentos, usa memoria o genera un
-   reporte.
-5. La funcion `search_documents_tool` busca informacion parecida en MongoDB
-   Atlas cuando la consulta lo necesita.
-6. El agente arma el prompt con la pregunta, memoria corta, memoria larga y
-   contexto recuperado.
-7. Groq genera la respuesta final.
-8. La respuesta se muestra en pantalla y tambien queda guardada en memoria.
-
-Si la pregunta pide un informe o reporte, se usa `generate_report_tool` para
-responder con una estructura mas ordenada.
-
-## Herramientas que deje implementadas
-
-Las herramientas estan en `src/tools.py` y usan el decorador `@tool` de
-LangChain. Esto me permite mostrar que el proyecto no solo tiene funciones
-sueltas, sino herramientas que pueden ser registradas por un agente.
-
-- `search_documents_tool`: busca informacion tecnica en los documentos cargados.
-- `get_memory_tool`: recupera los ultimos mensajes de la conversacion.
-- `save_memory_tool`: guarda mensajes del usuario y del asistente en la sesion.
-- `generate_report_tool`: genera un reporte breve usando el contexto recuperado.
-
-En `ingest.py` estas herramientas se construyen con `build_tools()` y se usan en
-el flujo principal del chat.
-
-## Memoria
-
-El proyecto usa dos tipos de memoria:
-
-- Memoria corta: usa `st.session_state` para mantener el historial mientras la
-  aplicacion esta abierta.
-- Memoria larga: usa `data/memory/long_term_memory.json` para guardar resumenes
-  de interacciones anteriores.
-
-Cuando se presiona `Reiniciar tutoria`, se borra el historial de la sesion.
-Eso no borra la memoria larga guardada en JSON.
-
-## Planificacion y decisiones
-
-El archivo `src/planner.py` clasifica cada consulta en una de estas intenciones:
-
-- `consulta_simple`
-- `consulta_tecnica`
-- `solicitud_reporte`
-- `continuidad_contexto`
-- `informacion_insuficiente`
-
-Con esa clasificacion, el agente decide que hacer:
-
-- si falta informacion, pide mas detalle;
-- si es una consulta simple, responde directo usando memoria;
-- si es tecnica, busca documentos antes de responder;
-- si pide reporte, usa contexto documental y genera una estructura ejecutiva;
-- si depende de algo anterior, incluye memoria corta y memoria larga.
-
-## Recuperacion semantica
-
-Para la recuperacion de contexto uso:
-
-- `HuggingFaceEmbeddings` con el modelo `all-MiniLM-L6-v2`.
-- `MongoDBAtlasVectorSearch` como base vectorial.
-- Base de datos: `GreenTech_DB`.
-- Coleccion: `manuals_vectors`.
-- Indice: `vector_index`.
-
-Los PDF no se leen directamente cada vez que se pregunta algo. Primero hay que
-cargarlos a MongoDB Atlas con `load_pdfs.py`. Despues el chat consulta esa
-coleccion vectorial.
-
-## Variables de entorno
-
-El proyecto necesita un archivo `.env` en la raiz con estas variables:
-
-```env
-GROQ_API_KEY=tu_api_key_de_groq
-MONGODB_ATLAS_URI=tu_uri_de_mongodb_atlas
+```
+greentech/
+├── ingest.py                  Aplicacion principal Streamlit con dashboard
+├── src/
+│   ├── agent.py               Agente principal con orchestracion
+│   ├── planner.py             Clasificador de intenciones
+│   ├── tools.py               Herramientas registradas con @tool
+│   ├── memory.py              Memoria larga en JSON
+│   ├── prompts.py             Plantillas de prompts
+│   ├── vectorstore.py         Configuracion de MongoDB Atlas
+│   ├── observability.py       Sistema de metricas y deteccion de anomalias
+│   ├── security.py            Guardrails eticos y de privacidad
+│   └── cache.py               Cache semantico para respuestas frecuentes
+├── tests/                     Pruebas automatizadas
+├── docs/                      Documentacion tecnica
+├── data/
+│   ├── logs/                  Logs de observabilidad y auditoria
+│   └── memory/                Memoria larga persistente
+└── requirements.txt           Dependencias del proyecto
 ```
 
-El archivo `.env` no se sube al repositorio porque contiene credenciales.
+## Funcionalidades implementadas
 
-## Instalacion local
+### RAG y recuperacion semantica
 
-Desde PowerShell:
+- Embeddings con `HuggingFaceEmbeddings` (modelo `all-MiniLM-L6-v2`)
+- Busqueda vectorial en MongoDB Atlas
+- Indice `vector_index` en coleccion `manuals_vectors`
+- Fragmentacion automatica de documentos PDF
+
+### Sistema de observabilidad
+
+El modulo `observability.py` implementa:
+
+- **Metric logging**: latencias por fase, tokens consumidos, costo USD estimado
+- **Quality scoring**: evaluacion de calidad de respuestas generadas
+- **System metrics**: uso de CPU, memoria RAM y threads del proceso
+- **AnomalyDetector**: deteccion automatica de latencias anomalas (P95),
+  rafagas de errores y patrones de falla por intencion
+- **Percentiles P50/P95/P99**: analisis estadistico de latencias
+
+### Dashboard de monitoreo
+
+La pestana "Dashboard de Observabilidad" en Streamlit muestra:
+
+- Tarjetas KPI: consultas totales, latencia promedio, tasa de exito,
+  precision RAG, alertas de seguridad, costo acumulado
+- Graficos de tendencia temporal para latencias y tokens
+- Distribucion de intenciones clasificadas
+- Analisis de anomalias con recomendaciones automaticas
+- Percentiles de latencia y patrones de error
+- Explorador de logs con filtros y exportacion a CSV
+
+### Seguridad y compliance
+
+El modulo `security.py` implementa:
+
+- **Enmascaramiento de PII**: correos electronicos, telefonos, credenciales API
+- **Deteccion de inyeccion de prompt**: palabras clave sospechosas
+- **Advertencias de seguridad fisica**: para consultas sobre riesgo electrico o alturas
+- **Auditoria de accesos**: logs inmutables con session ID y timestamp UTC
+- **Consentimiento**: registro de aceptacion de politicas de uso
+- **Politica de retencion**: maxima de 90 dias para logs de observabilidad
+
+### Cache semantico
+
+El modulo `cache.py` implementa:
+
+- Almacenamiento de respuestas basadas en similitud TF-IDF
+- Umbral de similitud configurable (default 0.92)
+- Estadisticas de uso: hits, latencia ahorrada, tokens economizados
+- Eviccion automatica de entradas mas antiguas (LRU)
+- Persistencia en archivo JSON Lines
+
+### Clasificador de intenciones
+
+El `planner.py` clasifica cada consulta en:
+
+- `consulta_simple`: respuesta directa con memoria
+- `consulta_tecnica`: busqueda de documentos + RAG
+- `solicitud_reporte`: generacion de reporte estructurado
+- `continuidad_contexto`: incluye memoria corta y larga
+- `informacion_insuficiente`: pide aclaracion al usuario
+
+## Instalacion
 
 ```powershell
 cd M:\GreenTech_Project
@@ -161,193 +114,93 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-Si el entorno virtual ya existe, basta con activarlo:
+## Configuracion de variables de entorno
 
-```powershell
-cd M:\GreenTech_Project
-.\venv\Scripts\activate
+Crear archivo `.env` en la raiz:
+
+```env
+GROQ_API_KEY=tu_api_key_de_groq
+MONGODB_ATLAS_URI=tu_uri_de_mongodb_atlas
 ```
 
-## Cargar los PDF en MongoDB Atlas
+## Carga de documentos
 
-Antes de usar el chat, hay que cargar los documentos:
+Antes de usar el chat, cargar los PDF en MongoDB Atlas:
 
 ```powershell
 .\venv\Scripts\python.exe load_pdfs.py --reset
 ```
 
-Uso `--reset` cuando quiero limpiar la coleccion y volver a cargar los PDF desde
-cero.
-
-En mi prueba, el cargador proceso los tres PDF y genero 92 fragmentos en la
-coleccion `manuals_vectors`.
-
-## Ejecutar la aplicacion
-
-Con el entorno virtual activado:
+## Ejecucion
 
 ```powershell
 streamlit run ingest.py
 ```
 
-Streamlit normalmente abre esta URL:
+Abrir en el navegador: `http://localhost:8501`
 
-```text
-http://localhost:8501
-```
-
-## Ejecutar con Docker
-
-Docker no es obligatorio para probar el proyecto. La forma mas directa es usar
-Python y Streamlit. Si quiero correrlo con Docker, primero debo abrir Docker
-Desktop y despues ejecutar:
+## Ejecucion con Docker
 
 ```powershell
 docker build -t greentech-mentor .
 docker run --env-file .env -p 8501:8501 greentech-mentor
 ```
 
-## Ejemplos de preguntas
+## Ejecucion de pruebas
+
+```powershell
+.\venv\Scripts\python.exe -m pytest tests/
+```
+
+## Ejemplos de consultas
+
+```text
+Explicame como funcionan los paneles solares y que es el efecto fotoelectrico.
+```
 
 ```text
 Cuales son las principales medidas de seguridad para instalar paneles fotovoltaicos?
 ```
 
 ```text
-Explicame que funcion cumple un inversor en un sistema fotovoltaico.
-```
-
-```text
 Genera un reporte ejecutivo sobre seguridad en instalaciones fotovoltaicas.
 ```
 
-## Errores que aparecieron durante la prueba
+## Modulos de aprendizaje rapido
 
-### 1. La aplicacion abria, pero parecia que no leia los PDF
+La barra lateral de Streamlit incluye botones para consultas guiadas sobre:
 
-Al principio el chat se conectaba, pero las respuestas no estaban usando los
-documentos. Revise la coleccion `GreenTech_DB.manuals_vectors` y tenia:
+- Fundamentos Fotovoltaicos
+- Protocolos de Seguridad
+- Sistemas de Almacenamiento
 
-```text
-document_count = 0
-```
+## Limitaciones y trabajo futuro
 
-Eso significaba que MongoDB Atlas estaba configurado, pero no tenia documentos
-vectorizados cargados. La solucion fue crear `load_pdfs.py` y cargar los PDF con:
+- La memoria larga usa resumenes simples; no hace compresion avanzada de conversaciones
+- Los PDF deben cargarse previamente con `load_pdfs.py`
+- La deteccion de reportes es por palabras clave (`reporte`, `informe`, `resumen`)
+- Se propone implementar busqueda hibrida (vectorial + BM25) con reranking
+- Se propone migrar Planner y Guardrails a un modelo SLM local
 
-```powershell
-.\venv\Scripts\python.exe load_pdfs.py
-```
+## Historial de cambios
 
-Despues de eso la coleccion quedo con 92 fragmentos.
+### Fase 3: Observabilidad y trazabilidad
 
-### 2. Python no encontraba `dotenv`
+- Sistema de metricas de rendimiento con AnomalyDetector
+- Dashboard interactivo con analisis en tiempo real
+- Cache semantico para reducir latencia y costo
+- Guardrails de seguridad y auditoria de compliance
+- Logging de calidad de respuestas
 
-Cuando intente revisar MongoDB usando `python` directamente, aparecio este error:
+### Fase 2: Agente con planificacion
 
-```text
-ModuleNotFoundError: No module named 'dotenv'
-```
+- Clasificador de intenciones
+- Herramientas registradas con @tool de LangChain
+- Memoria corta y larga
+- Generacion de reportes estructurados
 
-El problema era que estaba usando el Python global y no el entorno virtual del
-proyecto. La solucion fue ejecutar los comandos con:
+### Fase 1: MVP con RAG
 
-```powershell
-.\venv\Scripts\python.exe
-```
-
-### 3. Error de DNS al consultar MongoDB Atlas
-
-Tambien aparecio un error de resolucion DNS al intentar conectarme a MongoDB
-Atlas desde el entorno restringido:
-
-```text
-dns.resolver.LifetimeTimeout
-```
-
-La conexion funciono cuando ejecute el diagnostico con permisos de red. En una
-ejecucion local normal, esto depende de tener internet, que el URI de MongoDB sea
-correcto y que la IP este permitida en MongoDB Atlas.
-
-### 4. Advertencia de Hugging Face
-
-Al cargar los embeddings aparecio esta advertencia:
-
-```text
-You are sending unauthenticated requests to the HF Hub
-```
-
-No bloquea el funcionamiento. Solo avisa que se esta descargando el modelo sin
-token de Hugging Face. Para este proyecto no fue necesario configurar `HF_TOKEN`,
-pero podria agregarse si hubiera problemas de limite o descarga.
-
-### 5. Conflicto en README
-
-El README quedo con marcas de conflicto de Git despues de mezclar cambios. Lo
-corregi dejando una sola version del documento y eliminando las partes
-duplicadas.
-
-## Pruebas manuales
-
-Estas son las pruebas que use para comprobar el funcionamiento:
-
-1. Verifique que MongoDB Atlas tuviera documentos cargados.
-2. Ejecute una busqueda semantica de prueba sobre seguridad electrica.
-3. Confirme que devolvia fragmentos desde
-   `Guia_de_instalacion_de_SFD_-_2013.pdf`.
-4. Ejecute la aplicacion con `streamlit run ingest.py`.
-5. Probe una pregunta tecnica y una solicitud de reporte.
-
-La evidencia esta documentada en `docs/evidencia_pruebas.md`.
-
-## Documentacion tecnica
-
-- Diagrama de orquestacion: `docs/diagrama_orquestacion.md`
-- Flujo de trabajo del agente: `docs/flujo_trabajo.md`
-- Evidencia de pruebas: `docs/evidencia_pruebas.md`
-
-## Cumplimiento de indicadores IE1-IE10
-
-| Indicador | Como se cumple en el proyecto |
-|---|---|
-| IE1: Herramientas configuradas dentro del agente | Las herramientas estan en `src/tools.py` y usan `@tool`: `search_documents_tool`, `get_memory_tool`, `save_memory_tool` y `generate_report_tool`. |
-| IE2: Framework adecuado para agentes | Se usa LangChain para herramientas, Groq como LLM y Streamlit como interfaz. El agente principal esta en `src/agent.py`. |
-| IE3: Memoria de contenido | Hay memoria corta con `st.session_state` y memoria larga en JSON con `src/memory.py`. |
-| IE4: Recuperacion semantica de contexto | Se usa `HuggingFaceEmbeddings` y `MongoDBAtlasVectorSearch` en `src/vectorstore.py`. |
-| IE5: Planificacion de tareas | `src/planner.py` clasifica la intencion antes de responder. |
-| IE6: Toma de decisiones | `GreenTechAgent` decide si responde directo, busca documentos, genera reporte o pide mas informacion. |
-| IE7: README y diagrama de orquestacion | El README explica el proyecto y `docs/diagrama_orquestacion.md` contiene el diagrama Mermaid. |
-| IE8: Justificacion tecnica de componentes | El README explica por que se usan Streamlit, Groq, MongoDB Atlas, embeddings y memoria JSON. |
-| IE9: Informe tecnico, diagramas y flujos | La carpeta `docs/` contiene diagrama de orquestacion, flujo de trabajo y evidencia de pruebas. |
-| IE10: Lenguaje tecnico claro y evidencia | `docs/evidencia_pruebas.md` documenta escenarios de prueba y resultados esperados. |
-
-## Capturas de evidencia
-
-Si uso capturas de pantalla para respaldar las pruebas, las dejo en:
-
-```text
-docs/img/
-```
-
-Nombre sugerido:
-
-```text
-docs/img/prueba_1_pregunta_simple.png
-docs/img/prueba_2_consulta_tecnica.png
-docs/img/prueba_3_reporte.png
-```
-
-Luego se pueden referenciar desde `docs/evidencia_pruebas.md` asi:
-
-```markdown
-![Prueba 1 - pregunta simple](img/prueba_1_pregunta_simple.png)
-```
-
-## Limitaciones actuales
-
-- La memoria larga guarda resumenes simples; no hace todavia una compresion
-  avanzada de conversaciones.
-- Los PDF deben cargarse antes con `load_pdfs.py`.
-- La deteccion de reportes es simple: busca palabras como `reporte`, `informe` o
-  `resumen ejecutivo`.
-- Aun faltan pruebas automatizadas y documentos tecnicos separados en `docs/`.
+- Busqueda vectorial en MongoDB Atlas
+- Interface Streamlit
+- Integracion con Groq LLM
