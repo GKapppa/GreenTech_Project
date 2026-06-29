@@ -85,10 +85,14 @@ class ObservabilityLogger:
         no_info_indicators = [
             "no encontré",
             "no tengo información",
+            "no tengo informacion",
             "no puedo responder",
+            "no está en los documentos",
             "no está en los documentos",
             "insuficiente",
             "no puedo ayudarte con eso",
+            "lo siento",
+            "i'm sorry",
         ]
         has_content = not any(ind in answer_lower for ind in no_info_indicators)
 
