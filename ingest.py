@@ -252,6 +252,8 @@ with tab_chat:
     st.session_state.pending_prompt = None
 
     if prompt:
+        with st.chat_message("user"):
+            st.markdown(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         cached_answer, cache_meta = st.session_state.semantic_cache.get(prompt)
