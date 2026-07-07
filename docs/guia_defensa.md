@@ -1,41 +1,115 @@
 # Guia de Defensa - Mentor IA GreenTech
 
-## TEXTO PARA PRESENTACION (2-3 minutos)
+## TEXTO PARA PRESENTACION (5-7 minutos)
 
 ---
 
-**SLIDE 1 - INTRODUCCION:**
+### SLIDE 1 - INTRODUCCION (1 minuto)
 
-"Buenos dias, soy [nombre] y les presento el proyecto Mentor IA GreenTech, un sistema de induccion tecnica basado en agentes inteligentes para la empresa GreenTech del rubro energetico renovable.
+"Buenos dias/tardes, mi nombre es [nombre] y les presento el proyecto **Mentor IA GreenTech**.
 
-El problema que resuelve es que los nuevos tecnicos necesitan consultar manuales tecnicos extensos sobre sistemas fotovoltaicos, lo cual toma tiempo y no siempre es facil encontrar la informacion correcta.
+Este es un sistema de induccion tecnica inteligente disenado para la empresa GreenTech, que es una empresa lider en el rubro de energias renovables en Chile.
 
-Nuestra solucion es un chat inteligente que responde preguntas tecnicas usando recuperacion semantica y un modelo de lenguaje."
+**El problema que resolvemos** es el siguiente: cuando llega un nuevo tecnico a GreenTech, debe capacitare en sistemas fotovoltaicos consultando manuales tecnicos extensos. Este proceso toma entre 30 y 60 minutos por tema, y muchas veces no es facil encontrar exactamente la informacion que se necesita.
 
----
-
-**SLIDE 2 - ARQUITECTURA:**
-
-"La arquitectura se compone de cuatro capas:
-
-1. interfaz Streamlit donde el usuario hace preguntas
-2. Un agente orchestrador que clasifica la intencion del usuario
-3. Motor RAG con busqueda vectorial en MongoDB Atlas
-4. Modelo LLM Groq Llama 3.3 para generar respuestas
-
-El agente decide automaticamente si necesita buscar documentos, usar memoria o generar un reporte."
+**Nuestra solucion** es un asistente virtual inteligente que permite consultar los manuales tecnicos mediante lenguaje natural. En lugar de buscar en PDF, el tecnico simplemente hace una pregunta como 'Cuales son las medidas de seguridad para instalar paneles?' y el sistema le responde con la informacion relevante."
 
 ---
 
-**DEMO - streamlit run ingest.py:**
+### SLIDE 2 - ARQUITECTURA DEL SISTEMA (1.5 minutos)
 
-"Aqui pueden ver la aplicacion funcionando. Voy a hacer una pregunta tecnica..."
+"La arquitectura del sistema se compone de cuatro capas principales:
 
-**Pregunta demo:** "Explicame como funciona un panel solar"
+**Capa 1 - Interfaz de Usuario:** Usamos Streamlit, que es un framework de Python para crear aplicaciones web de forma rapida. El usuario interactua mediante un chat intuitivo.
 
-"Como ven, el sistema identifica la intencion como consulta tecnica, busca en los manuales vectorizados, recupera el contexto relevante y genera una respuesta con rigor tecnico.
+**Capa 2 - Agente Orquestador:** Este es el cerebro del sistema. Esta implementado en agent.py y su funcion es coordinar todas las decisiones. Recibe la pregunta del usuario, la analiza, y decide que acciones tomar.
 
-Noten que incluye advertencias de seguridad automaticamente cuando detecta riesgo electrico."
+**Capa 3 - Motor RAG:** RAG significa Retrieval-Augmented Generation, que es una arquitectura que combina busqueda de informacion con generacion de texto. Usamos MongoDB Atlas como base de datos vectorial, donde tenemos almacenados los manuales tecnicos convertidos en vectores numericos.
+
+**Capa 4 - Modelo de Lenguaje:** Finalmente, usamos Groq con el modelo Llama 3.3 de 70 mil millones de parametros para generar respuestas naturales basadas en el contexto recuperado.
+
+Lo importante aqui es que el **agente decide automaticamente** si necesita buscar documentos, usar memoria de conversaciones anteriores, o generar un reporte estructurado."
+
+---
+
+### SLIDE 3 - FLUJO DEL AGENTE (1 minuto)
+
+"Cuando el usuario hace una pregunta, ocurre lo siguiente:
+
+1. **Fase de Seguridad:** Primero validamos que la consulta no contenga intentos de inyeccion de prompt ni datos personales sin proteger.
+
+2. **Fase de Planificacion:** El planner clasifica la pregunta en una de cinco intenciones: consulta simple, consulta tecnica, solicitud de reporte, continuidad de contexto, o si necesita mas informacion.
+
+3. **Fase de Recuperacion:** Si es una consulta tecnica, buscamos en MongoDB Atlas los fragmentos mas relevantes usando busqueda semantica.
+
+4. **Fase de Generacion:** El LLM genera la respuesta usando el contexto recuperado.
+
+5. **Fase de Logging:** Todo se registra para observabilidad y auditoria."
+
+---
+
+### DEMO - streamlit run ingest.py (2-3 minutos)
+
+"Ahora les muestro el sistema funcionando en tiempo real.
+
+[Abrir Streamlit]
+
+[Aqui pueden ver la interfaz principal. A la izquierda tenemos un menu lateral con modulos de aprendizaje rapido y preguntas sugeridas. En el centro esta el area de chat.]
+
+[Realizar pregunta demo: "Explicame como funciona un panel solar"]
+
+[Mientras carga...] Noten que el sistema esta procesando la consulta. Podemos ver el spinner 'Buscando en los manuales tecnicos'.
+
+[Respuesta aparece] "Aqui tienen la respuesta generada. Como ven, incluye informacion tecnica precisa sobre el efecto fotoelectrico y como los fotones liberan electrones en el silicio.
+
+Noten que si la pregunta involucra riesgo de seguridad electrica, el sistema inyecta automaticamente una advertencia."
+
+[Segunda pregunta: "Cuales son las medidas de seguridad para trabajar con paneles?"]
+
+[Aqui el sistema detecta las palabras 'seguridad' y 'trabajar' y agrega la advertencia de EPP."
+
+---
+
+### SLIDE 4 - OBSERVABILIDAD Y MONITOREO (1 minuto)
+
+"Una parte crucial de cualquier sistema en produccion es la observabilidad.
+
+**Que monitoreamos?**
+
+- **Latencias por fase:** Cuanto tiempo tarda cada parte del flujo (planificacion, recuperacion, generacion)
+- **Tokens consumidos:** Cuanto nos cuesta cada consulta en terminos de API de Groq
+- **Precision RAG:** Que tan relevante es el contexto recuperado para la pregunta
+- **Calidad de respuestas:** Evaluamos si las respuestas tienen contenido util o si el LLM no pudo responder
+- **Metricas de sistema:** CPU y memoria RAM del servidor
+
+**El dashboard** nos muestra graficos de tendencias, percentiles de latencia P50, P95 y P99, y permite exportar los logs a CSV para analisis posterior."
+
+---
+
+### SLIDE 5 - SEGURIDAD Y ETICA (30 segundos)
+
+"Implementamos tres capas de seguridad:
+
+1. **Enmascaramiento de PII:** Correos, telefonos y credenciales se reemplazan automaticamente antes de procesar.
+2. **Deteccion de inyeccion de prompt:** Si alguien intenta manipular el comportamiento del LLM, lo blokqueamos.
+3. **Auditoria inmutable:** Todos los accesos quedan registrados con timestamp UTC.
+
+Ademas, el sistema respeta la normativa de proteccion de datos segun la Ley 19.628 de Chile."
+
+---
+
+### CIERRE (30 segundos)
+
+"En conclusion, el Mentor IA GreenTech permite:
+
+- Reducir el tiempo de capacitacion de 30-60 minutos a segundos
+- Responder con rigor tecnico basado en manuales oficiales
+- Mantener trazabilidad completa de todas las consultas
+- Garantizar la seguridad y privacidad de los usuarios
+
+El codigo esta disponible en GitHub y esta documentado para facilitar el mantenimiento y escalabilidad futura.
+
+Gracias, quedan algunas preguntas?"
 
 ---
 
@@ -141,3 +215,38 @@ R: "Tecnicos nuevos de GreenTech que necesitan capacitacion en sistemas fotovolt
 - "El planner clasifica en cinco intenciones posibles"
 - "Los logs son inmutables y auditables"
 - "El sistema alerta automaticamente sobre anomalias"
+
+---
+
+## TIPS PARA LA PRESENTACION
+
+### Antes de presentar:
+- Tener Streamlit abierto y funcionando
+- Tener 2-3 preguntas de prueba preparado
+- Verificar que MongoDB Atlas y Groq esten conectados
+- Tener el telefono en modo avion por si acaso
+
+### Durante la presentacion:
+- Hablar con confianza aunque haya errores tecnicos
+- Si algo falla, decir "esto es parte de lo que monitoreamos" y seguir
+- No leer las respuestas, explicar los conceptos
+- Usar las manos para indicar el flujo de datos
+- Hacer contacto visual con la comision
+
+### Si no saben algo:
+- "Esa es una muy buena pregunta, es parte de las mejoras futuras que propomos"
+- "Lo implementariamos de otra forma en produccion"
+- "Es una limitacion conocida que documentamos en el informe"
+
+### Frases de confianza:
+- "Tenemos metricas para medir eso"
+- "El sistema esta diseñado para eso"
+- "Lo pueden ver en el dashboard"
+- "Esta en el codigo fuente"
+
+### Lo que NO deben decir:
+- "Eso no lo implementamos"
+- "No se como funciona eso"
+- "El codigo esta烂"
+- "Eso fue cosa de mi companero"
+
