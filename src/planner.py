@@ -25,8 +25,11 @@ CONTEXT_KEYWORDS = ["eso", "lo anterior", "anterior", "como dijiste", "segun lo 
 TECHNICAL_KEYWORDS = [
     "fotovoltaico",
     "panel",
+    "paneles",
     "inversor",
+    "inversores",
     "bateria",
+    "baterias",
     "mppt",
     "irradiancia",
     "corriente",
@@ -34,24 +37,60 @@ TECHNICAL_KEYWORDS = [
     "seguridad",
     "instalacion",
     "sistema",
+    "sistemas",
     "energia",
+    "energias",
+    "renovable",
+    "renovables",
+    "solar",
     "proteccion",
     "carga",
+    "explicame",
+    "como funciona",
+    "como funcionan",
+    "que es",
+    "que son",
+    "definicion",
+    "fundamentos",
+    "efecto fotoelectrico",
+    "celula",
+    "celulas",
+    "silicio",
+    "electric",
+    "verde",
+    "verde",
+    "carbono",
+    "emisiones",
+    "sustentable",
+    "sostenible",
 ]
-SIMPLE_KEYWORDS = ["hola", "gracias", "quien eres", "que haces", "ayuda"]
+SIMPLE_KEYWORDS = ["hola", "gracias", "quien eres", "que haces", "ayuda", "buenos dias", "buenas tardes"]
 
 
 def classify_intent(question: str, has_memory: bool = False) -> Plan:
     normalized_question = question.strip().lower()
 
-    if not normalized_question or len(normalized_question.split()) < 2:
+    if not normalized_question:
         return Plan(
             intent=Intent.INFORMACION_INSUFICIENTE,
-            reason="La pregunta es demasiado breve para responder con seguridad.",
+            reason="No se detecto ninguna pregunta.",
             use_documents=False,
             use_memory=False,
             generate_report=False,
             ask_clarification=True,
+        )
+
+    greeting_words = ["hola", "hola!", "hola.", "saludos", "buenas", "buenos dias", "buenas tardes", "buenas noches", "buen dia"]
+    first_word = normalized_question.split()[0] if normalized_question.split() else ""
+
+    if normalized_question in greeting_words or first_word in greeting_words:
+        return Plan(
+            intent=Intent.CONSULTA_SIMPLE,
+            reason="Saludo inicial detectado.",
+            use_documents=False,
+            use_memory=False,
+            generate_report=False,
+            ask_clarification=False,
         )
 
     if any(keyword in normalized_question for keyword in REPORT_KEYWORDS):

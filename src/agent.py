@@ -162,23 +162,9 @@ class GreenTechAgent:
         relevance_score = self.observability_logger.calculate_semantic_relevance(sanitized_question, context)
 
         if not context.strip():
-            answer = (
-                "No encontre informacion suficiente en los manuales cargados para responder con rigor. "
-                "Valida este tema con un supervisor humano o con documentacion tecnica oficial adicional."
-            )
-            self.tool_registry["save_memory_tool"].invoke({"role": "assistant", "content": answer})
-            latencies["total"] = time.perf_counter() - total_start
-
-            self.observability_logger.log_execution(
-                question=sanitized_question,
-                answer=answer,
-                intent=plan.intent.value,
-                latencies=latencies,
-                tokens={"input_tokens": 0, "output_tokens": 0, "total_tokens": 0},
-                status="warning_empty_retrieval",
-                relevance_score=0.0,
-            )
-            return AgentResponse(answer, plan, context, short_memory, long_memory)
+            retrieval_status = "warning_empty_retrieval"
+        else:
+            retrieval_status = "success"
 
         # 4. Fase de Generación (LLM)
         gen_start = time.perf_counter()
@@ -214,7 +200,7 @@ class GreenTechAgent:
             intent=plan.intent.value,
             latencies=latencies,
             tokens=tokens,
-            status="success",
+            status=retrieval_status,
             relevance_score=relevance_score,
             security_alert=physical_warning_triggered,
         )

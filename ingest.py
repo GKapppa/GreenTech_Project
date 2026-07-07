@@ -193,8 +193,28 @@ with st.sidebar:
         st.session_state.messages = []
         st.session_state.pending_prompt = None
         st.rerun()
+    st.markdown("---")
+    st.header("Preguntas sugeridas")
+    st.markdown("Haz click en cualquier pregunta para probarla:")
+
+    suggested_questions = [
+        "Explicame el efecto fotoelectrico",
+        "Como funciona un panel solar?",
+        "Que es el MPPT en un regulador?",
+        "Cuales son las medidas de seguridad electrica?",
+        "Diferencia entre inversores string y microinversores",
+        "Como calcular el tamaño de un sistema fotovoltaico?",
+        "Que es el netbilling?",
+        "Explícame el efecto fotoelectrico y las celulas de silicio",
+    ]
+
+    for q in suggested_questions:
+        if st.button(q, use_container_width=True):
+            st.session_state.pending_prompt = q
+            st.rerun()
 
     st.markdown("---")
+
     st.caption(f"Session ID: `{st.session_state.session_id}`")
 
     cache_stats = st.session_state.semantic_cache.get_stats()
@@ -232,13 +252,16 @@ with tab_chat:
     st.session_state.pending_prompt = None
 
     if prompt:
-        with st.chat_message("user"):
-            st.markdown(prompt)
+        st.session_state.messages.append({"role": "user", "content": prompt})
 
         cached_answer, cache_meta = st.session_state.semantic_cache.get(prompt)
+        agent_response = None
+        current_intent = "unknown"
 
         if cached_answer and cache_meta.get("cache_hit"):
             final_answer = cached_answer
+            current_intent = cache_meta.get("cached_intent", "unknown")
+            st.session_state.messages.append({"role": "assistant", "content": final_answer})
             with st.chat_message("assistant"):
                 st.markdown(final_answer)
                 st.caption(f"Respuesta desde cache (similitud: {cache_meta.get('similarity', 0)*100:.1f}%)")
@@ -251,9 +274,11 @@ with tab_chat:
                         final_answer = agent_response.answer
 
                         if agent_response and agent_response.plan:
-                            cache_intent = agent_response.plan.intent.value
+                            current_intent = agent_response.plan.intent.value
+                            cache_intent = current_intent
                         else:
                             cache_intent = "unknown"
+                            current_intent = "unknown"
 
                         tokens_data = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
 
@@ -273,6 +298,7 @@ with tab_chat:
                         st.exception(exc)
 
             st.markdown(final_answer)
+            st.session_state.messages.append({"role": "assistant", "content": final_answer})
 
             if agent_response and getattr(agent_response, "security_alert", False):
                 st.warning("Esta consulta involucra riesgos de seguridad fisica y ha activado el protocolo de advertencia etica de GreenTech.")
@@ -288,7 +314,7 @@ with tab_chat:
             question=prompt,
             answer=final_answer,
             session_id=st.session_state.session_id,
-            intent=agent_response.plan.intent.value if agent_response and agent_response.plan else "unknown",
+            intent=current_intent,
             status="success",
         )
 
@@ -520,11 +546,20 @@ with tab_dashboard:
 
         display_df = filtered_df[display_cols].copy()
         display_df["timestamp"] = display_df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
-        display_df.columns = [
-            "Fecha/Hora (UTC)", "Pregunta", "Intencion", "Latencia Total (s)",
-            "Tokens Usados", "Costo (USD)", "Precision Semantica", "Calidad Respuesta",
-            "Estado", "Alerta Seguridad",
-        ]
+
+        col_labels = {
+            "timestamp": "Fecha/Hora (UTC)",
+            "question": "Pregunta",
+            "intent": "Intencion",
+            "latency_total": "Latencia Total (s)",
+            "total_tokens": "Tokens Usados",
+            "estimated_cost_usd": "Costo (USD)",
+            "relevance_score": "Precision Semantica",
+            "quality_score": "Calidad Respuesta",
+            "status": "Estado",
+            "security_alert": "Alerta Seguridad",
+        }
+        display_df.columns = [col_labels.get(c, c) for c in display_df.columns]
 
         st.dataframe(display_df, use_container_width=True)
         st.caption(f"Mostrando {len(display_df)} de {len(df)} registros.")
